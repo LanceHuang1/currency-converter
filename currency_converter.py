@@ -30,11 +30,11 @@ currencies = list(rates.keys())
 st.subheader("📌 選擇三個幣別")
 col1, col2, col3 = st.columns(3)
 with col1:
-    left_currency = st.selectbox("左幣別", currencies, index=currencies.index("USD"))
+    left_currency = st.selectbox("左幣別", currencies, index=currencies.index("USD") if "USD" in currencies else 0)
 with col2:
-    mid_currency = st.selectbox("中間幣別（基準）", currencies, index=currencies.index("TWD"))
+    mid_currency = st.selectbox("中間幣別（基準）", currencies, index=currencies.index("TWD") if "TWD" in currencies else 1)
 with col3:
-    right_currency = st.selectbox("右幣別", currencies, index=currencies.index("AED"))
+    right_currency = st.selectbox("右幣別", currencies, index=currencies.index("AED") if "AED" in currencies else 2)
 
 st.divider()
 
