@@ -2,10 +2,10 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
-st.set_page_config(page_title="三幣匯率試算", layout="centered")
-st.title("💱 美金 ↔️ 台幣 ↔️ 迪拉姆 匯率試算")
+st.set_page_config(page_title="三角匯率換算", layout="centered")
+st.title("💱 三角匯率換算工具（即時）")
 
-# 抓匯率資料（台灣銀行）
+# 抓取匯率資料
 @st.cache_data
 def fetch_rates():
     url = "https://rate.bot.com.tw/xrt?Lang=zh-TW"
@@ -17,55 +17,51 @@ def fetch_rates():
     for row in rows:
         cells = row.find_all('td')
         if len(cells) >= 3:
-            currency_name = row.find('div', {'class': 'visible-phone'}).text.strip()[:3]
+            currency = row.find('div', {'class': 'visible-phone'}).text.strip()[:3]
             rate = cells[2].text.strip()
             if rate != '-':
-                rate_dict[currency_name] = float(rate)
+                rate_dict[currency] = float(rate)
     return rate_dict
 
-# 匯率轉換函數
-def convert_from_twd(amount, target_currency, rates):
-    return amount / rates.get(target_currency, 1)
-
-def convert_to_twd(amount, source_currency, rates):
-    return amount * rates.get(source_currency, 1)
-
-# === 主程式 ===
 rates = fetch_rates()
+currencies = list(rates.keys())
 
-usd_rate = rates.get('USD', 0)
-aed_rate = rates.get('AED', 0)
-
+# 幣別選擇
+st.subheader("📌 選擇三個幣別")
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    usd_amount = st.number_input("💵 美金 (USD)", value=0.0, step=0.01)
-
+    left_currency = st.selectbox("左幣別", currencies, index=currencies.index("USD"))
 with col2:
-    twd_amount = st.number_input("🇹🇼 台幣 (TWD)", value=0.0, step=0.01)
-
+    mid_currency = st.selectbox("中間幣別（基準）", currencies, index=currencies.index("TWD"))
 with col3:
-    aed_amount = st.number_input("🇦🇪 迪拉姆 (AED)", value=0.0, step=0.01)
+    right_currency = st.selectbox("右幣別", currencies, index=currencies.index("AED"))
 
-st.markdown("---")
+st.divider()
 
-# 換算按鈕
-colA, colB, colC = st.columns(3)
+# 輸入金額與來源
+st.subheader("💰 輸入金額並選擇來源幣別")
+input_col, from_col = st.columns([3, 1])
+with input_col:
+    input_amount = st.number_input("輸入金額", value=0.0, min_value=0.0, step=0.01)
+with from_col:
+    input_currency = st.selectbox("來源幣別", [left_currency, mid_currency, right_currency])
 
-with colA:
-    if st.button("← USD ➜ TWD ➜ AED"):
-        twd = convert_to_twd(usd_amount, 'USD', rates)
-        aed = convert_from_twd(twd, 'AED', rates)
-        st.success(f"{usd_amount} USD ≈ {twd:.2f} TWD ≈ {aed:.2f} AED")
+# 計算邏輯（中介幣為 mid_currency）
+def to_mid(amount, currency):
+    return amount * rates[currency] if currency != mid_currency else amount
 
-with colB:
-    if st.button("← TWD ➜"):
-        usd = convert_from_twd(twd_amount, 'USD', rates)
-        aed = convert_from_twd(twd_amount, 'AED', rates)
-        st.success(f"{twd_amount} TWD ≈ {usd:.2f} USD & {aed:.2f} AED")
+def from_mid(amount, currency):
+    return amount / rates[currency] if currency != mid_currency else amount
 
-with colC:
-    if st.button("← AED ➜ TWD ➜ USD"):
-        twd = convert_to_twd(aed_amount, 'AED', rates)
-        usd = convert_from_twd(twd, 'USD', rates)
-        st.success(f"{aed_amount} AED ≈ {twd:.2f} TWD ≈ {usd:.2f} USD")
+mid_amount = to_mid(input_amount, input_currency)
+
+left_amount = from_mid(mid_amount, left_currency)
+right_amount = from_mid(mid_amount, right_currency)
+
+st.divider()
+st.subheader("📊 換算結果")
+
+res_col1, res_col2, res_col3 = st.columns(3)
+res_col1.metric(f"{left_currency}", f"{left_amount:,.2f}")
+res_col2.metric(f"{mid_currency}", f"{mid_amount:,.2f}")
+res_col3.metric(f"{right_currency}", f"{right_amount:,.2f}")
