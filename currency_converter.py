@@ -47,14 +47,18 @@ with from_col:
     input_currency = st.selectbox("來源幣別", [left_currency, mid_currency, right_currency])
 
 # 計算邏輯（中介幣為 mid_currency）
-def to_mid(amount, currency):
-    return amount * rates[currency] if currency != mid_currency else amount
+# 所有 rates 都是「某幣對台幣的匯率」（即 1 單位外幣等於幾台幣）
+def to_twd(amount, currency):
+    if currency == "TWD":
+        return amount
+    return amount * rates[currency]
 
-def from_mid(amount, currency):
-    return amount / rates[currency] if currency != mid_currency else amount
+def from_twd(twd_amount, currency):
+    if currency == "TWD":
+        return twd_amount
+    return twd_amount / rates[currency]
 
 mid_amount = to_mid(input_amount, input_currency)
-
 left_amount = from_mid(mid_amount, left_currency)
 right_amount = from_mid(mid_amount, right_currency)
 
