@@ -16,14 +16,22 @@ def fetch_rates():
     rate_dict = {}
     for row in rows:
         cells = row.find_all('td')
-        if len(cells) >= 3:
-            currency = row.find('div', {'class': 'visible-phone'}).text.strip()[:3]
-            rate = cells[2].text.strip()
-            if rate != '-':
-                rate_dict[currency] = float(rate)
+        if len(cells) >= 5:
+            currency = row.find('div', {'class': 'visible-phone'}).text.strip()[:3]  # 取得貨幣名稱（例如 USD）
+            rate = cells[2].text.strip()  # 即期匯率（買入匯率）
+            if rate != '-' and currency != 'TWD':  # 如果匯率不為 - 且不是台幣
+                try:
+                    rate_dict[currency] = float(rate)
+                except ValueError:
+                    pass  # 如果匯率轉換錯誤則跳過
+
     return rate_dict
 
 rates = fetch_rates()
+
+# 顯示抓取到的匯率
+st.write(rates)  # 顯示抓取到的匯率，這樣我們可以確認是否正確抓取
+
 currencies = list(rates.keys())
 
 # 幣別選擇
