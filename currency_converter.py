@@ -1,57 +1,71 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
-from datetime import datetime
 
-# 擷取台灣銀行匯率資料（包含所有貨幣）
+st.set_page_config(page_title="三幣匯率試算", layout="centered")
+st.title("💱 美金 ↔️ 台幣 ↔️ 迪拉姆 匯率試算")
+
+# 抓匯率資料（台灣銀行）
 @st.cache_data
 def fetch_rates():
     url = "https://rate.bot.com.tw/xrt?Lang=zh-TW"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
-    table = soup.find("table", {"title": "牌告匯率"}).tbody
-    rows = table.find_all("tr")
+    res = requests.get(url)
+    soup = BeautifulSoup(res.text, 'html.parser')
+    rows = soup.find_all('tr')
 
-    rates = {}
+    rate_dict = {}
     for row in rows:
-        currency_name = row.find("div", {"class": "visible-phone"}).get_text(strip=True)
-        currency_code = currency_name[:3]
-        cash_rate = row.find_all("td")[2].text.strip()
-        if cash_rate != '-':
-            rates[currency_code] = float(cash_rate)
-    return rates
+        cells = row.find_all('td')
+        if len(cells) >= 3:
+            currency_name = row.find('div', {'class': 'visible-phone'}).text.strip()[:3]
+            rate = cells[2].text.strip()
+            if rate != '-':
+                rate_dict[currency_name] = float(rate)
+    return rate_dict
 
-# 匯率換算邏輯：以 TWD 為中介
-def convert(amount, from_currency, to_currency, rates):
-    if from_currency == to_currency:
-        return amount
-    if from_currency != 'TWD':
-        amount = amount * rates[from_currency]  # 換成台幣
-    if to_currency != 'TWD':
-        amount = amount / rates[to_currency]    # 台幣換目標
-    return amount
+# 匯率轉換函數
+def convert_from_twd(amount, target_currency, rates):
+    return amount / rates.get(target_currency, 1)
 
-# ===== Streamlit UI =====
-st.set_page_config(page_title="即時匯率換算器", layout="centered")
-st.title("💱 即時匯率換算器（台灣銀行）")
+def convert_to_twd(amount, source_currency, rates):
+    return amount * rates.get(source_currency, 1)
 
+# === 主程式 ===
 rates = fetch_rates()
-currency_options = list(rates.keys())
 
-st.write("🔄 匯率資料來源：台灣銀行")
-st.write("📅 更新時間：", datetime.now().strftime("%Y-%m-%d %H:%M"))
+usd_rate = rates.get('USD', 0)
+aed_rate = rates.get('AED', 0)
 
-amount = st.number_input("💰 輸入金額", value=1.0)
-from_currency = st.selectbox("來源貨幣", currency_options, index=currency_options.index("USD") if "USD" in currency_options else 0)
-to_currency = st.selectbox("目標貨幣", currency_options, index=currency_options.index("TWD") if "TWD" in currency_options else 1)
+col1, col2, col3 = st.columns(3)
 
-if st.button("進行換算"):
-    result = convert(amount, from_currency, to_currency, rates)
-    st.success(f"{amount} {from_currency} ➜ {result:.4f} {to_currency}")
+with col1:
+    usd_amount = st.number_input("💵 美金 (USD)", value=0.0, step=0.01)
 
-# 匯率資料表
-with st.expander("📊 顯示即時匯率表"):
-    df = pd.DataFrame.from_dict(rates, orient='index', columns=['本行買入（TWD）'])
-    df.index.name = '幣別'
-    st.dataframe(df)
+with col2:
+    twd_amount = st.number_input("🇹🇼 台幣 (TWD)", value=0.0, step=0.01)
+
+with col3:
+    aed_amount = st.number_input("🇦🇪 迪拉姆 (AED)", value=0.0, step=0.01)
+
+st.markdown("---")
+
+# 換算按鈕
+colA, colB, colC = st.columns(3)
+
+with colA:
+    if st.button("← USD ➜ TWD ➜ AED"):
+        twd = convert_to_twd(usd_amount, 'USD', rates)
+        aed = convert_from_twd(twd, 'AED', rates)
+        st.success(f"{usd_amount} USD ≈ {twd:.2f} TWD ≈ {aed:.2f} AED")
+
+with colB:
+    if st.button("← TWD ➜"):
+        usd = convert_from_twd(twd_amount, 'USD', rates)
+        aed = convert_from_twd(twd_amount, 'AED', rates)
+        st.success(f"{twd_amount} TWD ≈ {usd:.2f} USD & {aed:.2f} AED")
+
+with colC:
+    if st.button("← AED ➜ TWD ➜ USD"):
+        twd = convert_to_twd(aed_amount, 'AED', rates)
+        usd = convert_from_twd(twd, 'USD', rates)
+        st.success(f"{aed_amount} AED ≈ {twd:.2f} TWD ≈ {usd:.2f} USD")
